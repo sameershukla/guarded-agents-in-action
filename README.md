@@ -218,7 +218,7 @@ The agents use Claude Sonnet 4.
 from langchain_anthropic import ChatAnthropic
 
 model = ChatAnthropic(
-    model="claude-sonnet-4-20250514"
+    model="claude-sonnet-4-6"
 )
 ```
 
@@ -229,3 +229,15 @@ The goal of this repository is not only to learn LangGraph.
 The goal is to learn how to build agents that can operate safely in real systems.
 
 We will especially focus on PII and financial use cases.
+
+## A Note on the Guardrail Implementations
+
+The guardrails in this repository use simple regex pattern matching for PII detection and prompt injection detection.
+
+This is good enough to learn the concepts and the architecture.
+
+It is not good enough for production use.
+
+Regex patterns are easy to bypass with paraphrasing, encoding tricks, or unusual formatting, and they can also produce false positives on legitimate text.
+
+A production system should pair this same architecture (guardrail nodes that run before/after the model and before/after tool execution) with a dedicated PII detection library or a classifier model, rather than hand-written regexes.

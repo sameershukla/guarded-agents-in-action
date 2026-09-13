@@ -30,7 +30,8 @@ INJECTION_PATTERNS = [
         re.IGNORECASE
     ),
     re.compile(
-        r"send\s+.*\s+to\s+.*",
+        r"send\s+.*(?:password|api\s*key|secret|credentials?)"
+        r".*\s+to\s+",
         re.IGNORECASE
     ),
 ]
