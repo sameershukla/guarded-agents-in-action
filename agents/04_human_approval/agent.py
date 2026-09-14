@@ -190,7 +190,13 @@ def route_by_risk(state: AgentState):
 
     # HIGH risk: never auto-executed or auto-blocked -- a human must
     # decide instead.
-    return "human_approval"
+    if state["risk_level"] == RiskLevel.HIGH:
+        return "human_approval"
+
+    # INVALID (unknown tool, bad amount): hard-blocked. A human is only
+    # asked to weigh in on actions that are valid but large, never on
+    # actions that should not exist at all.
+    return "block_tool"
 
 
 # ---------------------------------------------------------
@@ -238,9 +244,11 @@ def human_approval_node(state: AgentState):
         }
     )
 
-    # The resumed value becomes the human's approve/reject decision.
+    # The resumed value becomes the human's approve/reject decision. Only
+    # a literal True counts as approval -- a truthy string like "no" from
+    # a sloppy caller must not approve anything.
     return {
-        "human_approved": bool(decision)
+        "human_approved": decision is True
     }
 
 
@@ -255,6 +263,29 @@ def route_after_human(state: AgentState):
 
     # Human rejected (or approval wasn't granted): block the tool call.
     return "block_tool"
+
+
+# ---------------------------------------------------------
+# EXTRA TOOL CALLS
+# ---------------------------------------------------------
+
+def reject_extra_tool_calls(tool_calls: list) -> list:
+    # Only the FIRST tool call in a turn is validated and (maybe)
+    # executed. But the model may emit several tool calls at once, and
+    # every one of them must get a ToolMessage reply -- otherwise the
+    # next model call fails with a missing tool_result error. Anything
+    # beyond the first is answered with a denial, never executed.
+    return [
+        ToolMessage(
+            content=(
+                "Refund was not executed. "
+                "Reason: only one refund action "
+                "is processed per turn."
+            ),
+            tool_call_id=tool_call["id"]
+        )
+        for tool_call in tool_calls[1:]
+    ]
 
 
 # ---------------------------------------------------------
@@ -282,7 +313,12 @@ def execute_tool_node(state: AgentState):
     )
 
     return {
-        "messages": [tool_message]
+        "messages": [
+            tool_message,
+            *reject_extra_tool_calls(
+                last_message.tool_calls
+            ),
+        ]
     }
 
 
@@ -291,8 +327,8 @@ def execute_tool_node(state: AgentState):
 # ---------------------------------------------------------
 
 def block_tool_node(state: AgentState):
-    # Reached for MEDIUM-risk calls that failed validation, or HIGH-risk
-    # calls a human rejected -- the tool never runs.
+    # Reached for INVALID calls, MEDIUM-risk calls that failed validation,
+    # or HIGH-risk calls a human rejected -- the tool never runs.
     last_message = state["messages"][-1]
 
     tool_call = last_message.tool_calls[0]
@@ -322,7 +358,12 @@ def block_tool_node(state: AgentState):
     )
 
     return {
-        "messages": [tool_message]
+        "messages": [
+            tool_message,
+            *reject_extra_tool_calls(
+                last_message.tool_calls
+            ),
+        ]
     }
 
 
@@ -390,7 +431,8 @@ builder.add_conditional_edges(
 
 
 # After risk assessment: LOW risk executes immediately, MEDIUM risk goes
-# through additional validation, HIGH risk is escalated to a human.
+# through additional validation, HIGH risk is escalated to a human, and
+# INVALID calls are blocked without involving anyone.
 builder.add_conditional_edges(
     "risk_guardrail",
     route_by_risk,
@@ -398,6 +440,7 @@ builder.add_conditional_edges(
         "execute_tool": "execute_tool",
         "additional_validation": "additional_validation",
         "human_approval": "human_approval",
+        "block_tool": "block_tool",
     }
 )
 

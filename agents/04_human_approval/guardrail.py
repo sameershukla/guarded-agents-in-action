@@ -11,30 +11,36 @@ class RiskLevel(str, Enum):
     LOW = "low"
     # Larger refunds: allowed, but only after an extra validation check.
     MEDIUM = "medium"
-    # Disallowed tools, invalid amounts, or refunds large enough to need a
-    # human: routed to human_approval_node instead of auto-executing.
+    # Refunds large enough to need a human: routed to human_approval_node
+    # instead of auto-executing.
     HIGH = "high"
+    # Disallowed tools or invalid amounts: never valid, so never worth a
+    # human's time. These are hard-blocked rather than escalated -- a
+    # human should not be able to "approve" a negative refund or an
+    # unknown tool by accident.
+    INVALID = "invalid"
 
 
 def assess_financial_risk(
     tool_name: str,
     tool_args: dict
 ) -> dict:
-    # Any tool other than issue_refund is treated as high risk and
-    # rejected outright (fail closed / deny-by-default).
+    # Any tool other than issue_refund is rejected outright (fail closed /
+    # deny-by-default). This is INVALID, not HIGH: it is never escalated.
     if tool_name != "issue_refund":
         return {
-            "risk_level": RiskLevel.HIGH,
+            "risk_level": RiskLevel.INVALID,
             "reason": f"Tool {tool_name} is not allowed."
         }
 
     # Pull the requested refund amount, defaulting to 0 if missing.
     amount = tool_args.get("amount", 0)
 
-    # Zero, negative, or missing amounts are invalid and high risk.
-    if amount <= 0:
+    # Zero, negative, missing, or non-numeric amounts are invalid and are
+    # hard-blocked rather than sent to a human.
+    if not isinstance(amount, (int, float)) or amount <= 0:
         return {
-            "risk_level": RiskLevel.HIGH,
+            "risk_level": RiskLevel.INVALID,
             "reason": "Refund amount must be greater than zero."
         }
 

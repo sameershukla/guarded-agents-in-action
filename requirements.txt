@@ -1,4 +1,11 @@
-langchain-anthropic>=0.1.0
-langchain-core>=0.2.0
-langgraph>=0.1.0
-pydantic
+# Pinned to the versions the agents were developed and tested against.
+# LangGraph 1.x is required: agent 04 relies on interrupt()/Command(),
+# and 1.x has breaking changes versus the 0.x line.
+langchain-core==1.6.3
+langchain-anthropic==1.7.2
+langgraph==1.2.11
+langgraph-checkpoint==4.2.0
+pydantic==2.13.5
+
+# Test dependency (run with: python -m pytest)
+pytest==9.1.1

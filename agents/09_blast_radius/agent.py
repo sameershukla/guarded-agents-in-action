@@ -191,7 +191,9 @@ def action_guardrail_node(
 
     decision = validate_refund_action(
         tool_name,
-        tool_args
+        tool_args,
+        expected_customer_id=
+            state["customer_id"],
     )
 
 
@@ -283,6 +285,29 @@ def route_after_blast_radius(
 
 
 # ---------------------------------------------------------
+# EXTRA TOOL CALLS
+# ---------------------------------------------------------
+
+def reject_extra_tool_calls(tool_calls: list) -> list:
+    # Only the FIRST tool call in a turn is validated and (maybe)
+    # executed. But the model may emit several tool calls at once, and
+    # every one of them must get a ToolMessage reply -- otherwise the
+    # next model call fails with a missing tool_result error. Anything
+    # beyond the first is answered with a denial, never executed.
+    return [
+        ToolMessage(
+            content=(
+                "Refund was not executed. "
+                "Reason: only one refund action "
+                "is processed per turn."
+            ),
+            tool_call_id=tool_call["id"]
+        )
+        for tool_call in tool_calls[1:]
+    ]
+
+
+# ---------------------------------------------------------
 # EXECUTE TOOL
 # ---------------------------------------------------------
 
@@ -312,7 +337,10 @@ def execute_tool_node(
 
     return {
         "messages": [
-            tool_message
+            tool_message,
+            *reject_extra_tool_calls(
+                last_message.tool_calls
+            ),
         ]
     }
 
@@ -398,7 +426,10 @@ def block_tool_node(
 
     return {
         "messages": [
-            tool_message
+            tool_message,
+            *reject_extra_tool_calls(
+                last_message.tool_calls
+            ),
         ]
     }
 

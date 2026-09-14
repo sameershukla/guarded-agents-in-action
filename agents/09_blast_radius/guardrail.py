@@ -22,7 +22,8 @@ MAX_REFUNDS_PER_HOUR = 5
 
 def validate_refund_action(
     tool_name: str,
-    tool_args: dict
+    tool_args: dict,
+    expected_customer_id: str
 ) -> dict:
     # The same kind of single-action check seen in 02_financial_action:
     # judges this one proposed refund purely on its own terms, with no
@@ -33,9 +34,23 @@ def validate_refund_action(
             "reason": f"Tool {tool_name} is not allowed."
         }
 
+    # The customer_id in the tool call is chosen by the model, but the
+    # blast radius ledger is keyed by the customer_id the *caller*
+    # supplied. If the two disagree, the refund would go to one customer
+    # while the ledger charged it to another -- silently bypassing the
+    # per-customer limit. Validate exactly what will be executed.
+    if tool_args.get("customer_id") != expected_customer_id:
+        return {
+            "allowed": False,
+            "reason": (
+                "Refund customer_id does not match "
+                "the customer for this session."
+            )
+        }
+
     amount = tool_args.get("amount", 0)
 
-    if amount <= 0:
+    if not isinstance(amount, (int, float)) or amount <= 0:
         return {
             "allowed": False,
             "reason": "Refund amount must be greater than zero."

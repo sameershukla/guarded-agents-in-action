@@ -124,21 +124,16 @@ def sanitize_output(
 def validate_output(
     text: str
 ) -> dict:
-    # Three possible outcomes, checked in order of severity: PII can be
-    # fixed by redacting it (sanitize), risky advice cannot be fixed by
-    # editing so the whole response is replaced (block), and anything
-    # else is safe to show as-is (allow).
+    # Three possible outcomes, checked from most to least severe. The
+    # most severe check must run first: risky advice cannot be fixed by
+    # editing, so the whole response is replaced (block). Only a draft
+    # that survives that check is considered for redaction (sanitize),
+    # and anything else is safe to show as-is (allow). Checking PII
+    # first would let a draft containing BOTH PII and risky advice slip
+    # through as merely "sanitized".
     pii_types = detect_output_pii(
         text
     )
-
-    if pii_types:
-
-        return {
-            "decision": "sanitize",
-            "reason": "PII detected in model output.",
-            "pii_types": pii_types,
-        }
 
     risky_advice = (
         detect_risky_financial_advice(
@@ -154,7 +149,15 @@ def validate_output(
                 "Potentially unsafe financial "
                 "advice detected."
             ),
-            "pii_types": [],
+            "pii_types": pii_types,
+        }
+
+    if pii_types:
+
+        return {
+            "decision": "sanitize",
+            "reason": "PII detected in model output.",
+            "pii_types": pii_types,
         }
 
     return {

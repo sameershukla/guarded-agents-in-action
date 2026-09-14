@@ -4,7 +4,7 @@ This repository is a practical learning project for building AI agents with guar
 
 The goal is to learn agent development and guardrail development together.
 
-We will use LangGraph to build the agents and Claude Sonnet 4 as the language model.
+We will use LangGraph to build the agents and Claude Sonnet 4.6 as the language model.
 
 ## What We Will Learn
 
@@ -160,7 +160,7 @@ LangGraph
 
 LangChain
 
-Claude Sonnet 4
+Claude Sonnet 4.6
 
 Pydantic
 
@@ -210,9 +210,19 @@ Add the Anthropic API key to the environment.
 ANTHROPIC_API_KEY=your_key
 ```
 
+## Tests
+
+Every guardrail is a plain function, so its policy can be tested without calling the model.
+
+```bash
+python -m pytest
+```
+
+The tests in `tests/` cover the boundary cases of each guardrail (amount limits, risk tiers, PII detection, plan ordering, cumulative limits) and the agent-level routing decisions.
+
 ## Model
 
-The agents use Claude Sonnet 4.
+The agents use Claude Sonnet 4.6.
 
 ```python
 from langchain_anthropic import ChatAnthropic
